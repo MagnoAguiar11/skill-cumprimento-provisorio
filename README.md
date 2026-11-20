@@ -25,7 +25,7 @@ Abra o Claude Code (no app do Claude, aba **Code**, ou no terminal com `claude`)
 
 > Instale esta skill: https://github.com/MagnoAguiar11/skill-cumprimento-provisorio
 
-O Claude lê as instruções abaixo, pede sua autorização e roda o instalador. Ele instala o uv (que cuida do Python e das bibliotecas), baixa a skill, coloca na pasta de skills do Claude e testa tudo. Não pede senha de administrador. Para atualizar depois, cole o mesmo pedido.
+O Claude lê as instruções abaixo, pede sua autorização e roda o instalador. Ele baixa a skill, coloca na pasta de skills do Claude, instala o uv (que cuida do Python e das bibliotecas) e testa tudo. Se o uv não instalar (rede que bloqueia o site dele, por exemplo), a skill monta um Python próprio com o python3 do computador e segue funcionando. Não pede senha de administrador. Para atualizar depois, cole o mesmo pedido.
 
 ### Instruções para o Claude Code
 
@@ -43,13 +43,17 @@ Quando o usuário pedir para instalar ou atualizar esta skill, rode o instalador
   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/MagnoAguiar11/skill-cumprimento-provisorio/main/instalar.ps1 | iex"
   ```
 
-O instalador demora alguns minutos na primeira vez e termina listando os testes ("ok: todos os testes passaram"). Mostre esse resultado ao usuário e diga para abrir uma **sessão nova** do Claude Code, anexar o PDF do processo baixado do PJe e os prints da aba Expedientes e pedir: "Faça o cumprimento provisório deste processo". Se algum teste falhar, mostre a mensagem e tente corrigir a causa (por exemplo, rodar de novo depois de reabrir o terminal).
+O instalador demora alguns minutos na primeira vez, lista os testes e termina com a linha `RESULTADO: OK` ou `RESULTADO: FALHOU`, seguida do motivo e do caminho do log (`~/.cache/skill-cumprimento-provisorio/instalacao.log`; no Windows, `%LOCALAPPDATA%\skill-cumprimento-provisorio\instalacao.log`). Com `RESULTADO: OK`, diga ao usuário para abrir uma **sessão nova** do Claude Code, anexar o PDF do processo baixado do PJe e os prints da aba Expedientes e pedir: "Faça o cumprimento provisório deste processo". Com `RESULTADO: FALHOU`, leia o log, corrija a causa e rode de novo. A falta do uv sozinha não é falha: o instalador segue sem ele.
+
+Se não puder rodar o comando que baixa da internet (`curl ... | bash`), baixe o repositório (`git clone` ou o .zip) e rode o instalador de dentro dele: `bash instalar.sh` (no Windows, `powershell -ExecutionPolicy Bypass -File instalar.ps1`). Ele instala a partir da cópia local.
+
+Depois de instalada, se algum script disser que o Python da skill não está pronto, rode `python3 ~/.claude/skills/cumprimento-provisorio/scripts/ambiente.py`: ele prepara e testa o ambiente sozinho (`--status` mostra o que está em uso).
 
 Quem preferir pode rodar o mesmo comando direto no terminal, sem o Claude.
 
 ### Instalação manual
 
-Sem o instalador: copie a pasta `cumprimento-provisorio` deste repositório para `~/.claude/skills/` (no Windows, `%USERPROFILE%\.claude\skills\`) e instale o uv pelo site https://docs.astral.sh/uv/. No Windows, use o instalador oficial do uv no PowerShell, e não o `winget`, que pode travar pedindo permissão para instalar o Visual C++. A pasta `Cumprimento Provisórios - HRH` é criada na Área de Trabalho (com o OneDrive ligado, na Área de Trabalho do OneDrive).
+Sem o instalador: copie a pasta `cumprimento-provisorio` deste repositório para `~/.claude/skills/` (no Windows, `%USERPROFILE%\.claude\skills\`) e rode `python3 ~/.claude/skills/cumprimento-provisorio/scripts/ambiente.py`. O uv é opcional; se quiser instalá-lo, use o site https://docs.astral.sh/uv/ (no Windows, o instalador oficial no PowerShell, e não o `winget`, que pode travar pedindo permissão para instalar o Visual C++). A pasta `Cumprimento Provisórios - HRH` é criada na Área de Trabalho (com o OneDrive ligado, na Área de Trabalho do OneDrive).
 
 ### Claude.ai
 
@@ -63,8 +67,9 @@ Compacte a pasta `cumprimento-provisorio` em .zip e envie na área de Skills das
   python3 cumprimento-provisorio/scripts/astreintes.py --teste
   ```
 
-- Para ler o processo: [MarkItDown](https://github.com/microsoft/markitdown) 0.1.9 (Microsoft, licença MIT). Basta ter o [uv](https://docs.astral.sh/uv/) instalado: o `scripts/ler_processo.py` roda o MarkItDown pelo `uv`, sem instalação permanente, uma página por vez (inteiro, ele junta as páginas de PDFs com tabela, como os do PJe). Sem o uv, usa o `markitdown` instalado (`pip install 'markitdown[pdf]'`, Python 3.10+), mas as páginas podem vir juntas. Sem nenhum dos dois, a skill usa `pdftotext` (poppler) ou, no Mac, o PDFKit (`scripts/pdf_texto.swift`). Teste: `python3 cumprimento-provisorio/scripts/ler_processo.py --teste`.
-- O Word (`scripts/gerar_docx.py`, python-docx) e os PDFs (`scripts/montar_kit.py`, pypdf) saem pelo uv. O demonstrativo em PDF usa o Google Chrome ou o Microsoft Edge (que já vem no Windows). O destaque da aba Expedientes lê o print com o OCR do próprio sistema: o Vision no Mac e o OCR do Windows no Windows 10/11 (no Linux, o RapidOCR). Se o MarkItDown não rodar (no Windows sem o Visual C++), a leitura do processo usa o pypdfium2 e avisa.
+- As bibliotecas (MarkItDown, pypdf, pypdfium2, Pillow e python-docx, em versões fixadas) ficam por conta do `scripts/ambiente.py`. Ele usa o [uv](https://docs.astral.sh/uv/), que traz o Python 3.12, mesmo que o uv não esteja no PATH do terminal. Sem uv, ou se o uv não conseguir baixar o Python, ele cria um Python próprio da skill (`~/.cache/skill-cumprimento-provisorio/venv`; no Windows, em `%LOCALAPPDATA%`) com o Python do computador e instala as bibliotecas do PyPI na primeira vez. Nada pede senha de administrador.
+- Para ler o processo: [MarkItDown](https://github.com/microsoft/markitdown) 0.1.9 (Microsoft, licença MIT), uma página por vez (inteiro, ele junta as páginas de PDFs com tabela, como os do PJe). O MarkItDown pede Python 3.10+; no Python 3.9 do Mac sem uv, o texto sai do pypdfium2, com o mesmo mapa de IDs. Teste: `python3 cumprimento-provisorio/scripts/ler_processo.py --teste`.
+- O Word (`scripts/gerar_docx.py`, python-docx) e os PDFs (`scripts/montar_kit.py`, pypdf) saem pelo mesmo ambiente. O demonstrativo em PDF usa o Google Chrome ou o Microsoft Edge (que já vem no Windows). O destaque da aba Expedientes lê o print com o OCR do próprio sistema: o Vision no Mac e o OCR do Windows no Windows 10/11 (no Linux, o RapidOCR). Se o MarkItDown não rodar (no Windows sem o Visual C++), a leitura do processo usa o pypdfium2 e avisa.
 - Opcional: a extensão Claude in Chrome para pesquisar no JusBrasil.
 
 ## Estrutura
@@ -77,7 +82,8 @@ cumprimento-provisorio/
   references/dispositivos.md    texto literal da lei, conferido nas fontes oficiais
   references/precedentes.md     julgados do STJ e do TJCE conferidos, com link
   references/estrutura-da-peca.md  modelo da petição e tabela de valores
-  scripts/ler_processo.py       leitura do processo com o MarkItDown e mapa de IDs
+  scripts/ambiente.py           acha o uv ou monta o Python próprio da skill, com as bibliotecas
+  scripts/ler_processo.py       leitura do processo com o MarkItDown e mapa de IDs; páginas escaneadas em PNG
   scripts/astreintes.py         calculadora de prazos e valores
   scripts/correcao.py           demonstrativo de atualização com o índice oficial (INCC-DI, IGP-M, IPCA, INPC)
   scripts/montar_kit.py         procuração sozinha e demais documentos num PDF com marcadores, na pasta do cliente

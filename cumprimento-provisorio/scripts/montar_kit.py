@@ -19,15 +19,14 @@ O processo.md é o gerado por ler_processo.py (títulos "### Página N · ID X (
 """
 import argparse
 import json
-import os
 import re
-import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-# Junta páginas, PDFs e imagens com marcadores; roda pelo uv para não exigir instalação.
+import ambiente  # acha o uv (mesmo fora do PATH) ou o Python próprio da skill
+
+# Junta páginas, PDFs e imagens com marcadores; roda pelo ambiente.py (uv ou Python próprio da skill).
 JUNTAR = r'''
 import io, json, sys
 from pypdf import PdfReader, PdfWriter
@@ -50,11 +49,6 @@ for arquivo in plano["arquivos"]:
     w.write(arquivo["saida"])
 '''
 IMAGEM = (".png", ".jpg", ".jpeg")
-# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
-# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
-ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
-PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
-UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
 
 
 def mapa_de_paginas(md):
@@ -126,8 +120,6 @@ def main():
     juntos, f2 = planejar([tuple(x.split("=", 1)) for x in a.item], mapa)
     if f1 + f2:
         sys.exit("Nada foi gerado:\n - " + "\n - ".join(f1 + f2))
-    if not shutil.which("uv"):
-        sys.exit("Instale o uv (https://docs.astral.sh/uv/) para montar os PDFs.")
     pasta = a.pasta.expanduser()
     pasta.mkdir(parents=True, exist_ok=True)
     arquivos = [{"saida": str(pasta / f"{x['rotulo']}.pdf"), "itens": [x], "marcadores": False} for x in avulsos]
@@ -136,8 +128,10 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         plano = Path(tmp, "plano.json")
         plano.write_text(json.dumps({"pdf": str(a.pdf.resolve()), "arquivos": arquivos}), encoding="utf-8")
-        r = subprocess.run(["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "pypdf==5.1.0", "--with", "pillow==10.4.0",
-                            "python", "-c", JUNTAR, str(plano)], capture_output=True, **UTF8)
+        try:
+            r = ambiente.rodar(["pypdf==5.1.0", "pillow==10.4.0"], ["-c", JUNTAR, str(plano)])
+        except ambiente.SemAmbiente as e:
+            ambiente.falhar(e)
         if r.returncode != 0:
             sys.exit("Falha ao montar os PDFs:\n" + r.stderr[-2000:])
     for arq in arquivos:

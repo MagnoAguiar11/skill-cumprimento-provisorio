@@ -21,12 +21,15 @@ Esta skill transforma o processo completo numa petição de cumprimento provisó
 
 ## Referências
 
-No Windows, rode os scripts com `python` (ou `py`) no lugar de `python3`; sem Python instalado, use `uv run --no-project --python 3.12 python` (o uv baixa o Python sozinho). O resto é igual. Todos os scripts funcionam no Windows, no Mac e no Linux (testados num Windows 11 em 20/11/2026); só o `pdf_texto.swift` é do Mac e tem alternativa abaixo. Se o MarkItDown não rodar no computador (no Windows sem o Visual C++), o `ler_processo.py` lê o texto pelo pypdfium2 e avisa; o mapa de IDs sai igual.
+No Windows, rode os scripts com `python` (ou `py`) no lugar de `python3`; sem Python instalado, use o comando que o instalador mostrou no fim (`uv run --no-project --python 3.12 python`, com o caminho completo do uv se o terminal não o achar). O resto é igual.
+
+**Bibliotecas.** Os scripts acham sozinhos o que precisam, por `scripts/ambiente.py`: o uv, mesmo fora do PATH (o terminal do Claude Code muitas vezes não enxerga o uv recém-instalado), ou, sem ele, um Python próprio da skill, que se monta na primeira vez com o python3 do computador e as bibliotecas do PyPI. Nunca diga ao advogado que falta o uv nem peça que ele instale algo à mão: se um script disser que o Python da skill não está pronto, rode `python3 scripts/ambiente.py` (prepara e testa; `--status` mostra o que está em uso) e só então relate o que ele disser. Todos os scripts funcionam no Windows, no Mac e no Linux (testados num Windows 11 em 20/11/2026); só o `pdf_texto.swift` é do Mac e tem alternativa abaixo. Se o MarkItDown não rodar no computador (no Windows sem o Visual C++), o `ler_processo.py` lê o texto pelo pypdfium2 e avisa; o mapa de IDs sai igual.
 
 - `references/dispositivos.md`: texto literal vigente do CPC, da Lei 11.419/2006, da Resolução CNJ 455/2022 e da Súmula 410, conferido nas fontes oficiais.
 - `references/precedentes.md`: julgados do STJ e do TJCE já conferidos, com trecho literal e link, organizados por tema. É o ponto de partida da pesquisa, não o fim.
 - `references/estrutura-da-peca.md`: modelo da petição, parágrafos-base, tabela de valores e pedidos.
-- `scripts/ler_processo.py`: lê o PDF com o MarkItDown e monta o mapa de IDs (`--teste` faz a autoverificação).
+- `scripts/ler_processo.py`: lê o PDF com o MarkItDown e monta o mapa de IDs; `--imagem 12,13` transforma páginas escaneadas em PNG (`--teste` faz a autoverificação).
+- `scripts/ambiente.py`: acha o uv ou monta o Python próprio da skill para os demais scripts; rode-o se algum script disser que o Python não está pronto.
 - `scripts/pdf_texto.swift`: no Mac, texto do PDF e páginas escaneadas em imagem, sem instalar nada.
 - `scripts/astreintes.py`: calculadora de ciência, prazo, dias de descumprimento e valor (rode `--teste` antes do primeiro uso; `--help` mostra as opções).
 - `scripts/correcao.py`: demonstrativo de atualização no modelo do advogado, com o número-índice oficial (INCC-DI, IGP-M, IPCA ou INPC, do Ipeadata) e conferência do encadeamento com o SGS do Banco Central.
@@ -44,7 +47,7 @@ No Windows, rode os scripts com `python` (ou `py`) no lugar de `python3`; sem Py
 python3 scripts/ler_processo.py processo.pdf
 ```
 
-O script roda o [MarkItDown](https://github.com/microsoft/markitdown) na versão fixada 0.1.9, pelo `uv`, sem instalação permanente. Ele manda **uma página por vez**, porque o MarkItDown junta todas as páginas quando o PDF tem alguma tabela ou formulário, e o índice do PJe tem. Sem `uv`, o script usa o `markitdown` instalado; nesse caso as páginas podem vir juntas, e o script avisa. O resultado é o `processo.md`, gravado ao lado do PDF, com:
+O script roda o [MarkItDown](https://github.com/microsoft/markitdown) na versão fixada 0.1.9 (pelo uv ou pelo Python próprio da skill). Ele manda **uma página por vez**, porque o MarkItDown junta todas as páginas quando o PDF tem alguma tabela ou formulário, e o índice do PJe tem. Se o MarkItDown não rodar no computador (Python 3.9 do Mac sem uv, ou Windows sem o Visual C++), o texto sai do pypdfium2, com o mesmo mapa de IDs, e o script avisa. O resultado é o `processo.md`, gravado ao lado do PDF, com:
 
 - o **mapa de documentos**: ID do PJe, páginas do PDF, quem assinou, data e início do texto;
 - a lista de **páginas sem texto** (escaneadas);
@@ -60,8 +63,8 @@ Leia o mapa primeiro e use as buscas abaixo no `processo.md`.
   - "O sistema registrou ciência em" é ciência tácita (fim dos 10 dias corridos). Também vale como intimação pessoal (Lei 11.419/2006, art. 5º, §§ 3º e 6º).
   - "Comunicação frustrada" quer dizer que não houve intimação.
   - A "data limite" do expediente serve para conferir a conta da calculadora.
-- **Páginas escaneadas** (AR, certidões, comprovantes, prints) não têm texto. Transforme-as em imagem (em qualquer sistema: `uv run --no-project --python 3.12 --with pypdfium2==4.30.0 --with pillow==10.4.0 python -c "import sys, pypdfium2 as p; d = p.PdfDocument(sys.argv[1]); [d[int(n) - 1].render(scale=2).to_pil().save(f'pagina-{n}.png') for n in sys.argv[2:]]" processo.pdf 12 13`; no Mac, também `swift scripts/pdf_texto.swift processo.pdf --imagem 12,13 pasta`) e leia os PNG. Em outros sistemas, leia essas páginas com a ferramenta de leitura de PDF. Nunca presuma o conteúdo de página que não leu: o AR assinado pelo devedor costuma estar justamente numa delas.
-- **Sem MarkItDown e sem uv:** `pdftotext -layout`, ou, no Mac, `swift scripts/pdf_texto.swift processo.pdf > processo.txt`. Avise o advogado e monte o mapa de IDs à mão (documento, tipo, data e ID) antes de seguir.
+- **Páginas escaneadas** (AR, certidões, comprovantes, prints) não têm texto. Transforme-as em imagem (em qualquer sistema: `python3 scripts/ler_processo.py processo.pdf --imagem 12,13 --pasta paginas`; no Mac, também `swift scripts/pdf_texto.swift processo.pdf --imagem 12,13 pasta`) e leia os PNG. Em outros sistemas, leia essas páginas com a ferramenta de leitura de PDF. Nunca presuma o conteúdo de página que não leu: o AR assinado pelo devedor costuma estar justamente numa delas.
+- **Se nem o `ambiente.py` conseguir preparar o Python** (sem internet na primeira vez, por exemplo): `pdftotext -layout`, ou, no Mac, `swift scripts/pdf_texto.swift processo.pdf > processo.txt`. Avise o advogado e monte o mapa de IDs à mão (documento, tipo, data e ID) antes de seguir.
 
 **Buscas úteis no texto:** `Num. `, `Assinado eletronicamente`, `Domicílio Judicial`, `DJEN`, `Diário`, `expediente`, `ciência`, `Decorrido prazo`, `mandado`, `AR`, `intime-se`, `multa`, `astreinte`, `por dia`, `limitad`, `teto`, `até o limite`, `tutela`, `liminar`, `efeito suspensivo`, `agravo`, `apelação`, `trânsito`, `gratuidade`, `justiça gratuita`, `valor da causa`, `Súmula`, `Tema`, `descumpri`, `majora`, `bloqueio`, `SISBAJUD`.
 

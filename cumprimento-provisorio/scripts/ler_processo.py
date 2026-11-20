@@ -8,22 +8,20 @@ Se o MarkItDown não rodar no computador, o texto sai do pypdfium2 (--leitor esc
 
   python3 ler_processo.py processo.pdf              -> grava processo.md ao lado do PDF
   python3 ler_processo.py processo.pdf -o saida.md
+  python3 ler_processo.py processo.pdf --imagem 12,13 [--pasta dir]  -> pagina-12.png, pagina-13.png (páginas escaneadas)
   python3 ler_processo.py --teste
 """
 import argparse
-import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-MARKITDOWN = "markitdown[pdf]==0.1.9"
-# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
-# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
-ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
-PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
-UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
+import ambiente  # acha o uv (mesmo fora do PATH) ou o Python próprio da skill
+from ambiente import MARKITDOWN, UTF8
+
+PDFIUM = "pypdfium2==4.30.0"
 
 ID_PJE = re.compile(r"Num\.\s*(\d{5,})\s*-\s*P[áa]g\.\s*(\d+)")
 ASSINATURA = re.compile(r"Assinado eletronicamente por:\s*(.+?)\s*-\s*(\d{2}/\d{2}/\d{4})")
@@ -60,30 +58,63 @@ sys.stdout.write("\f".join(doc[i].get_textpage().get_text_bounded().replace("\r\
 '''
 
 
+# Páginas escaneadas viram PNG para serem lidas como imagem.
+IMAGEM = r'''
+import sys
+from pathlib import Path
+import pypdfium2 as pdfium
+doc, pasta = pdfium.PdfDocument(sys.argv[1]), Path(sys.argv[2])
+for n in sys.argv[3:]:
+    destino = pasta / f"pagina-{n}.png"
+    doc[int(n) - 1].render(scale=2).to_pil().save(destino)
+    print(destino)
+'''
+
+
 def converter(pdf, leitor="auto"):
-    if leitor == "pdfium":
-        if not shutil.which("uv"):
-            sys.exit("Instale o uv (https://docs.astral.sh/uv/) para ler o PDF.")
-        cmd = ["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "pypdfium2==4.30.0", "python", "-c", SO_PDFIUM, str(pdf)]
-    elif shutil.which("uv"):
-        cmd = ["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", MARKITDOWN, "python", "-c", POR_PAGINA, str(pdf)]
-    elif shutil.which("markitdown"):
-        # shortcut: sem uv, o documento vai inteiro e as páginas podem vir juntas; instale o uv para separar
-        cmd = ["markitdown", str(pdf)]
-    else:
-        sys.exit("MarkItDown não encontrado. Instale o uv (https://docs.astral.sh/uv/) "
-                 "ou rode: pip install 'markitdown[pdf]' (Python 3.10+).")
-    r = subprocess.run(cmd, capture_output=True, **UTF8)
-    if r.returncode != 0 and leitor == "auto" and shutil.which("uv"):
-        print("O MarkItDown não rodou neste computador; o texto foi lido pelo pypdfium2. Motivo:\n"
-              + r.stderr.strip()[-600:], file=sys.stderr)
-        return converter(pdf, "pdfium")
+    """(texto com as páginas separadas por \\f, nome do leitor usado)"""
+    if leitor in ("auto", "markitdown"):
+        try:
+            r = ambiente.rodar([MARKITDOWN], ["-c", POR_PAGINA, str(pdf)])
+            motivo = r.stderr.strip()[-600:]
+        except ambiente.SemAmbiente as e:
+            r, motivo = None, str(e)
+        if r is not None and r.returncode == 0:
+            _avisos(r.stderr)
+            return r.stdout, f"MarkItDown ({MARKITDOWN})"
+        if leitor == "markitdown":
+            sys.exit("O MarkItDown não rodou neste computador:\n" + motivo)
+        print("O MarkItDown não rodou neste computador; o texto foi lido pelo pypdfium2 (o mapa de IDs sai igual). "
+              "Motivo:\n" + motivo, file=sys.stderr)
+    try:
+        r = ambiente.rodar([PDFIUM], ["-c", SO_PDFIUM, str(pdf)])
+    except ambiente.SemAmbiente as e:
+        if shutil.which("markitdown"):  # último recurso: o documento vai inteiro e as páginas podem vir juntas
+            r = subprocess.run(["markitdown", str(pdf)], capture_output=True, **UTF8)
+            if r.returncode == 0:
+                return r.stdout, "MarkItDown instalado no computador"
+        ambiente.falhar(e)
     if r.returncode != 0:
         sys.exit("A leitura do PDF falhou:\n" + r.stderr[-2000:])
-    avisos = [l for l in r.stderr.splitlines() if l.strip() and "FontBBox" not in l]  # ruído do pdfminer
+    _avisos(r.stderr)
+    return r.stdout, f"pypdfium2 ({PDFIUM})"
+
+
+def _avisos(stderr):
+    avisos = [l for l in stderr.splitlines() if l.strip() and "FontBBox" not in l]  # ruído do pdfminer
     if avisos:
         print("\n".join(avisos)[-1000:], file=sys.stderr)
-    return r.stdout
+
+
+def imagens(pdf, paginas, pasta):
+    pasta.mkdir(parents=True, exist_ok=True)
+    try:
+        r = ambiente.rodar([PDFIUM, "pillow==10.4.0"], ["-c", IMAGEM, str(pdf), str(pasta), *paginas])
+    except ambiente.SemAmbiente as e:
+        ambiente.falhar(e)
+    if r.returncode != 0:
+        sys.exit("Falha ao gerar as imagens:\n" + r.stderr[-1500:])
+    print(r.stdout.strip())
 
 
 def faixas(nums):
@@ -126,9 +157,9 @@ def mapear(texto):
     return saida, docs, sem_texto
 
 
-def montar(nome, saida, docs, sem_texto):
+def montar(nome, saida, docs, sem_texto, leitor=f"MarkItDown ({MARKITDOWN})"):
     md = [f"# Processo: {nome}", "",
-          f"Texto extraído com MarkItDown ({MARKITDOWN}). {len(saida)} páginas, {len(docs)} documentos com ID.", ""]
+          f"Texto extraído com {leitor}. {len(saida)} páginas, {len(docs)} documentos com ID.", ""]
     if docs:
         md += ["## Mapa de documentos", "", "| ID | Páginas do PDF | Assinado por | Data | Início do texto |", "|---|---|---|---|---|"]
         for id_, d in docs.items():
@@ -137,7 +168,7 @@ def montar(nome, saida, docs, sem_texto):
         md.append("")
     if sem_texto:
         md += ["## Páginas sem texto (provavelmente escaneadas)", "",
-               f"{faixas(sem_texto)}. Leia como imagem (no Mac: `swift scripts/pdf_texto.swift processo.pdf --imagem {','.join(map(str, sem_texto[:20]))}`).", ""]
+               f"{faixas(sem_texto)}. Leia como imagem: `python3 scripts/ler_processo.py {nome} --imagem {','.join(map(str, sem_texto[:20]))}`.", ""]
     md += ["## Texto", ""]
     for rotulo, texto in saida:
         md += [f"### {rotulo}", "", texto or "[sem texto]", ""]
@@ -150,20 +181,28 @@ def main():
     ap.add_argument("-o", "--saida", type=Path)
     ap.add_argument("--leitor", choices=["auto", "markitdown", "pdfium"], default="auto",
                     help="auto: MarkItDown e, se ele não rodar, pypdfium2")
+    ap.add_argument("--imagem", help="páginas do PDF a transformar em PNG, ex.: 12,13 (páginas escaneadas)")
+    ap.add_argument("--pasta", type=Path, help="pasta das imagens (padrão: a do PDF)")
     ap.add_argument("--teste", action="store_true", help="roda a autoverificação")
     a = ap.parse_args()
     if a.teste:
         return _teste()
     if not a.pdf or not a.pdf.is_file():
         ap.error("informe o PDF do processo")
-    texto = converter(a.pdf, a.leitor)
+    if a.imagem:
+        paginas = [p.strip() for p in a.imagem.split(",") if p.strip()]
+        if not all(p.isdigit() for p in paginas):
+            ap.error("--imagem recebe números de página separados por vírgula, ex.: 12,13")
+        return imagens(a.pdf, paginas, (a.pasta or a.pdf.parent).expanduser())
+    texto, leitor = converter(a.pdf, a.leitor)
     saida, docs, sem_texto = mapear(texto)
     destino = a.saida or a.pdf.with_suffix(".md")
-    destino.write_text(montar(a.pdf.name, saida, docs, sem_texto), encoding="utf-8")
+    destino.write_text(montar(a.pdf.name, saida, docs, sem_texto, leitor), encoding="utf-8")
     print(f"{destino}: {len(saida)} página(s), {len(docs)} documento(s) com ID, "
           f"{len(sem_texto)} página(s) sem texto" + (f" ({faixas(sem_texto)})" if sem_texto else ""))
     if "\f" not in texto and len(ID_PJE.findall(texto)) > 1:
-        print("ATENÇÃO: as páginas vieram juntas, e o mapa de IDs não é confiável. Instale o uv e rode de novo.", file=sys.stderr)
+        print("ATENÇÃO: as páginas vieram juntas, e o mapa de IDs não é confiável. Rode python3 scripts/ambiente.py e leia de novo.",
+              file=sys.stderr)
 
 
 def _teste():

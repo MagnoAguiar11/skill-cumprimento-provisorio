@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Converte a petição em Markdown simples num .docx na folha timbrada do escritório (python-docx, pelo uv).
+"""Converte a petição em Markdown simples num .docx na folha timbrada do escritório (python-docx; scripts/ambiente.py acha o uv ou o Python próprio da skill).
 
 A folha timbrada é assets/folha-modelo.docx (cabeçalho com a logo e rodapé com o endereço); troque com --modelo.
 
@@ -20,18 +20,12 @@ Marcações aceitas:
   python3 gerar_docx.py --teste
 """
 import argparse
-import os
-import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
-# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
-ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
-PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
-UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
+import ambiente  # acha o uv (mesmo fora do PATH) ou o Python próprio da skill
+
 MODELO = Path(__file__).resolve().parent.parent / "assets" / "folha-modelo.docx"
 
 GERAR = r'''
@@ -254,13 +248,13 @@ def main():
 
 
 def gerar(md, saida, modelo=MODELO):
-    if not shutil.which("uv"):
-        sys.exit("Instale o uv (https://docs.astral.sh/uv/) para gerar o Word.")
     if modelo and not Path(modelo).exists():
         sys.exit(f"Folha timbrada não encontrada: {modelo} (use --modelo ou --sem-modelo)")
     Path(saida).expanduser().parent.mkdir(parents=True, exist_ok=True)  # cria a pasta do cliente, se faltar
-    r = subprocess.run(["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "python-docx==1.1.2", "python", "-c", GERAR,
-                        str(md), str(Path(saida).expanduser()), str(modelo or "")], capture_output=True, **UTF8)
+    try:
+        r = ambiente.rodar(["python-docx==1.1.2"], ["-c", GERAR, str(md), str(Path(saida).expanduser()), str(modelo or "")])
+    except ambiente.SemAmbiente as e:
+        ambiente.falhar(e)
     if r.returncode != 0:
         sys.exit("Falha ao gerar o Word:\n" + r.stderr[-2000:])
 

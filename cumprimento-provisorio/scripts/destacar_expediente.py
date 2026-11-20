@@ -2,7 +2,7 @@
 """Destaca, nos prints da aba "Expedientes" do PJe, a linha de cada expediente pedido e gera um PDF.
 
 Lê o texto do print com o OCR do próprio sistema, sem instalar nada: no Mac, o Vision (ocr_linhas.swift);
-no Windows 10/11, o Windows.Media.Ocr (ocr_linhas.ps1). No Linux, o RapidOCR, que o uv baixa sozinho.
+no Windows 10/11, o Windows.Media.Ocr (ocr_linhas.ps1). No Linux, o RapidOCR, que scripts/ambiente.py instala sozinho.
 A linha do expediente vai do título "Intimação (N) - Prioridade..." até o título do expediente
 seguinte; ela recebe fundo amarelo e borda vermelha, e a frase da ciência ("... registrou ciência
 em ...") recebe marca-texto. As páginas com destaque vêm primeiro; as demais seguem na ordem dada.
@@ -23,14 +23,12 @@ import tempfile
 import unicodedata
 from pathlib import Path
 
+import ambiente  # acha o uv (mesmo fora do PATH) ou o Python próprio da skill
+from ambiente import UTF8
+
 AQUI = Path(__file__).resolve().parent
-# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
-# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
-ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
-PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
-UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}
 TITULO = re.compile(r"^[a-z]+\((\d+)\)-prioridade")  # texto normalizado: "intimacao(1234567)-prioridade:normal..."
-RAPIDOCR = ["--with", "rapidocr_onnxruntime==1.3.24", "--with", "pillow==10.4.0"]
+RAPIDOCR = ["rapidocr_onnxruntime==1.3.24", "pillow==10.4.0"]
 
 LER = r'''
 import json, sys
@@ -84,8 +82,14 @@ def ocr(imagem, motor="auto"):
         shutil.copyfile(imagem, local)
         cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(AQUI / "ocr_linhas.ps1"), str(local)]
     else:
-        cmd = ["uv", "run", "--no-project", "--quiet", *PYTHON, *RAPIDOCR, "python", "-c", LER, str(imagem)]
-    r = subprocess.run(cmd, capture_output=True, **UTF8)
+        cmd = None
+    if cmd:
+        r = subprocess.run(cmd, capture_output=True, **UTF8)
+    else:
+        try:
+            r = ambiente.rodar(RAPIDOCR, ["-c", LER, str(imagem)])
+        except ambiente.SemAmbiente as e:
+            ambiente.falhar(e)
     if r.returncode != 0:
         sys.exit(f"Falha no OCR de {imagem}:\n{r.stderr[-1500:]}")
     dados = [json.loads(l) for l in r.stdout.splitlines() if l.startswith("{")]
@@ -122,8 +126,6 @@ def main():
         return _teste()
     if not (a.imagens and a.expediente and a.saida):
         ap.error("informe os prints, ao menos um --expediente e -o saída.pdf")
-    if not shutil.which("uv"):
-        sys.exit("Instale o uv (https://docs.astral.sh/uv/) para ler e destacar o print.")
     paginas, achados = [], set()
     for img in a.imagens:
         linhas, largura, altura = ocr(img, a.ocr)
@@ -139,8 +141,10 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         plano = Path(tmp, "plano.json")
         plano.write_text(json.dumps({"saida": str(a.saida.resolve()), "paginas": paginas}), encoding="utf-8")
-        r = subprocess.run(["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "pillow==10.4.0", "python", "-c", DESENHAR,
-                            str(plano)], capture_output=True, **UTF8)
+        try:
+            r = ambiente.rodar(["pillow==10.4.0"], ["-c", DESENHAR, str(plano)])
+        except ambiente.SemAmbiente as e:
+            ambiente.falhar(e)
         if r.returncode != 0:
             sys.exit("Falha ao desenhar:\n" + r.stderr[-1500:])
     print(f"{a.saida}: {len(paginas)} página(s); destacados: {', '.join(sorted(achados))}")
