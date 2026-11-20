@@ -144,6 +144,8 @@ Pergunte se pode seguir e não redija antes da resposta.
    - **TJCE:** o formulário `https://esaj.tjce.jus.br/cjsg/consultaCompleta.do` exige navegador (tem reCAPTCHA invisível). Desmarque "Pesquisar por sinônimos" para busca exata. O PDF do acórdão abre direto em `https://esaj.tjce.jus.br/cjsg/getArquivo.do?cdAcordao=N&cdForo=0`.
    - **JusBrasil:** só pelo Chrome do advogado, com a extensão Claude in Chrome.
    
+   - **Busca geral na web:** sempre pelo Google (google.com), nunca pelo Bing. No Windows, não use a busca do menu Iniciar, que pesquisa no Bing.
+
    Faça uma consulta por vez, porque buscas em rajada são bloqueadas, e feche as abas que abrir.
 4. Acrescente a `references/precedentes.md` o julgado novo que conferir, para a próxima peça.
 
