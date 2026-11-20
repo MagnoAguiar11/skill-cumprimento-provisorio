@@ -16,7 +16,7 @@ A petição é lida por um juiz com pouco tempo, e o primeiro ataque da executad
 
 ! Distribuição por dependência ao processo nº [número CNJ]
 
-**[EXEQUENTE]**, [nacionalidade], [estado civil], [profissão], portador(a) do RG nº ______, inscrito(a) no CPF sob o nº ______, endereço eletrônico ______, residente e domiciliado(a) na [endereço completo, CEP], [beneficiário(a) da justiça gratuita (ID ______),] por seus advogados (procuração anexa), com endereço profissional na [endereço do escritório], onde recebem intimações, vem requerer o
+**[EXEQUENTE]**, [nacionalidade], [estado civil], [profissão], portador(a) do RG nº ______, inscrito(a) no CPF sob o nº ______, endereço eletrônico ______, residente e domiciliado(a) na [endereço completo, CEP], [beneficiário(a) da justiça gratuita (ID ______),] por seus advogados (procuração anexa), com endereço profissional na [endereço do escritório como está na inicial ou na procuração] (ID ______), onde recebem intimações, vem requerer o
 
 # CUMPRIMENTO PROVISÓRIO DE DECISÃO: [DEPÓSITO JUDICIAL E] MULTA COMINATÓRIA
 
@@ -40,7 +40,7 @@ Atribui-se a este cumprimento provisório o valor de R$ ______.
 OAB/[UF] [número]           OAB/[UF] [número]
 ```
 
-O cumprimento provisório é autuado em apartado, por dependência: é processo incidental novo, por isso a qualificação é completa (e os CPF/CNPJ são exigidos pelo art. 524, I). O endereçamento e a linha da distribuição vão com `!` (negrito, justificado, sem recuo e sem espaço entre parágrafos). Os documentos vão na pasta do cliente (SKILL.md, Fase 4), não no Word.
+Cada dado da qualificação é copiado do processo, com a grafia de lá e com o ID; o que faltar fica "[______]" e vai para as pendências (regra 9 do SKILL.md). O cumprimento provisório é autuado em apartado, por dependência: é processo incidental novo, por isso a qualificação é completa (e os CPF/CNPJ são exigidos pelo art. 524, I). O endereçamento e a linha da distribuição vão com `!` (negrito, justificado, sem recuo e sem espaço entre parágrafos). Os documentos vão na pasta do cliente (SKILL.md, Fase 4), não no Word.
 
 ## Parágrafos-base
 

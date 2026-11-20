@@ -99,6 +99,8 @@ def main():
     if faltam:
         sys.exit(f"Expediente(s) não encontrado(s) nos prints: {', '.join(faltam)}. Nada foi gerado.")
     paginas.sort(key=lambda p: not p["faixas"])  # páginas com destaque primeiro
+    a.saida = a.saida.expanduser()
+    a.saida.parent.mkdir(parents=True, exist_ok=True)  # cria a pasta do cliente, se faltar
     with tempfile.TemporaryDirectory() as tmp:
         plano = Path(tmp, "plano.json")
         plano.write_text(json.dumps({"saida": str(a.saida.resolve()), "paginas": paginas}), encoding="utf-8")

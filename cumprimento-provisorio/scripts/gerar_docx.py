@@ -252,8 +252,9 @@ def gerar(md, saida, modelo=MODELO):
         sys.exit("Instale o uv (https://docs.astral.sh/uv/) para gerar o Word.")
     if modelo and not Path(modelo).exists():
         sys.exit(f"Folha timbrada não encontrada: {modelo} (use --modelo ou --sem-modelo)")
+    Path(saida).expanduser().parent.mkdir(parents=True, exist_ok=True)  # cria a pasta do cliente, se faltar
     r = subprocess.run(["uv", "run", "--no-project", "--quiet", "--with", "python-docx==1.1.2", "python", "-c", GERAR,
-                        str(md), str(saida), str(modelo or "")], capture_output=True, text=True)
+                        str(md), str(Path(saida).expanduser()), str(modelo or "")], capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit("Falha ao gerar o Word:\n" + r.stderr[-2000:])
 

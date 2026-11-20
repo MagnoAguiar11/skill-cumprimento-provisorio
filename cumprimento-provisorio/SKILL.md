@@ -17,6 +17,7 @@ Esta skill transforma o processo completo numa petição de cumprimento provisó
 6. **Peça desconsiderada some.** Se o advogado mandar desconsiderar uma peça (desentranhada, protocolada por engano, refeita), ela sai da análise inteira: não serve de fato, de parâmetro, de conta nem de modelo, e não entra no kit. Faça os cálculos com os critérios desta skill.
 7. **Sem majoração por conta própria.** Use só a multa que o juiz fixou. Não peça majoração e não reitere pedido de majoração que o juiz não decidiu, salvo se o advogado pedir.
 8. **Limite pela proporcionalidade.** Sem teto na decisão, a peça diz que a exequente limita a multa ao valor da obrigação principal em respeito à razoabilidade e à proporcionalidade (art. 537, caput: "suficiente e compatível com a obrigação"), com o TJCE (ED 0640351-55.2022.8.06.0000) e o STJ (AgInt no AREsp 1.638.130/SP) de `precedentes.md`. A peça não diz que a multa vencida não pode ser reduzida: isso fica só no diagnóstico, para o advogado.
+9. **Nenhum dado inventado.** Todo dado da peça e dos documentos sai do processo, com ID, ou da resposta do advogado: nomes, qualificação, endereços, CPF/CNPJ, juízo, datas, valores, expedientes e quem assina. Copie a grafia do processo, sem corrigir nem completar ("Muller" fica "Muller"). O tratamento do magistrado (Juiz ou Juíza) vem do cargo que ele mesmo põe na assinatura das decisões ("Juíza de Direito"), nunca do nome. Os advogados, a OAB e o endereço do escritório vêm da procuração ou da inicial. Dado que não está no processo fica "[______]" na peça e vai para a lista de pendências ao advogado.
 
 ## Referências
 
@@ -125,7 +126,7 @@ DECIDA:
  (c) atualizar os valores? O índice é o da sentença ou da decisão de tutela (ID); pergunte o índice só se nenhuma das duas o fixou.
  (d) ressalvar o saldo acima do limite para a execução definitiva?
  (e) só depósito em conta judicial, ou pedir também o levantamento (exige caução ou dispensa)?
- (f) quem assina (nome e OAB)?
+ (f) quem assina? Sugira os advogados da procuração (ID), com nome e OAB como estão nela.
 ```
 
 Pergunte se pode seguir e não redija antes da resposta.
@@ -154,7 +155,7 @@ Escreva a petição em Markdown (marcações em `gerar_docx.py --help`) e gere o
 
 **Demonstrativo de cálculo.** Monte um Markdown com cartões de resumo (total, principal e multa), a tabela-resumo, a conta da multa (ciência, vencimento, período, dias, valor diário, acumulado e o limite aplicado) e, se houve atualização, a tabela de `scripts/correcao.py`. Gere o PDF com `scripts/demonstrativo_pdf.py` e abra-o para conferir: nada de página quase vazia nem tabela cortada no fim.
 
-**Entrega numa pasta.** A pasta principal fica na Mesa: `~/Desktop/Cumprimento Provisórios - HRH` (para outro grupo executado, `Cumprimento Provisórios - [executada]`). Dentro dela, uma subpasta com o nome completo do cliente, com:
+**Entrega numa pasta.** A pasta principal fica na Mesa (Área de Trabalho) de quem estiver usando a skill: `~/Desktop/Cumprimento Provisórios - HRH` (para outro grupo executado, `Cumprimento Provisórios - [executada]`). No Windows com OneDrive, a Mesa pode ser `~/OneDrive/Desktop` ou `~/OneDrive/Área de Trabalho`: confira onde ela está antes. Dentro da pasta principal, uma subpasta com o nome completo do cliente, como está no PJe. Os scripts criam as pastas que faltarem; não peça ao advogado que as crie. A subpasta recebe:
 
 1. `Cumprimento provisório - [cliente] - [nº do processo].docx`: a petição;
 2. `Procuração - [cliente].pdf`: só a procuração da parte do advogado (com a declaração de hipossuficiência, se vier junto), nunca a da parte adversa;

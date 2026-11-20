@@ -130,6 +130,8 @@ def chrome():
 
 
 def gerar_pdf(html_txt, saida):
+    saida = Path(saida).expanduser()
+    saida.parent.mkdir(parents=True, exist_ok=True)  # cria a pasta, se faltar
     with tempfile.TemporaryDirectory() as tmp:
         pagina = Path(tmp, "demonstrativo.html")
         pagina.write_text(html_txt, encoding="utf-8")
