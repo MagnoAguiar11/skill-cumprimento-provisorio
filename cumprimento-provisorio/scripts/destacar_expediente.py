@@ -1,31 +1,50 @@
 #!/usr/bin/env python3
 """Destaca, nos prints da aba "Expedientes" do PJe, a linha de cada expediente pedido e gera um PDF.
 
-Acha o texto com o Vision do macOS (ocr_linhas.swift). A linha do expediente vai do título
-"Intimação (N) - Prioridade..." até o título do expediente seguinte; ela recebe fundo amarelo e
-borda vermelha, e a frase da ciência ("... registrou ciência em ...") recebe marca-texto.
-As páginas com destaque vêm primeiro; as demais seguem na ordem dada.
+Lê o texto do print com OCR: no Mac, o Vision do sistema (ocr_linhas.swift); no Windows e no Linux,
+o RapidOCR, que o uv baixa sozinho na primeira vez (demora cerca de 2 minutos; depois fica em cache).
+A linha do expediente vai do título "Intimação (N) - Prioridade..." até o título do expediente
+seguinte; ela recebe fundo amarelo e borda vermelha, e a frase da ciência ("... registrou ciência
+em ...") recebe marca-texto. As páginas com destaque vêm primeiro; as demais seguem na ordem dada.
 
   python3 destacar_expediente.py print1.png print2.png --expediente 1234567 --expediente 1234568 \
       -o "Aba Expedientes - 0000123-45.2025.pdf"
   python3 destacar_expediente.py --teste
+(no Windows, use "python" ou "py" no lugar de "python3")
 """
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
-TITULO = re.compile(r"^\S+ \((\d+)\) - Prioridade")  # "Intimação (1234567) - Prioridade: Normal - ..."
+UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}
+TITULO = re.compile(r"^[a-z]+\((\d+)\)-prioridade")  # texto normalizado: "intimacao(1234567)-prioridade:normal..."
+RAPIDOCR = ["--with", "rapidocr_onnxruntime==1.3.24", "--with", "pillow==10.4.0"]
+
+LER = r'''
+import json, sys
+import numpy as np
+from PIL import Image
+from rapidocr_onnxruntime import RapidOCR
+img = Image.open(sys.argv[1]).convert("RGB")
+print(json.dumps({"largura": img.width, "altura": img.height}))
+res, _ = RapidOCR()(np.array(img)[:, :, ::-1])
+for caixa, texto, _conf in res or []:
+    xs, ys = [p[0] for p in caixa], [p[1] for p in caixa]
+    print(json.dumps({"texto": texto, "x": int(min(xs)), "y": int(min(ys)), "w": int(max(xs) - min(xs)), "h": int(max(ys) - min(ys))}))
+'''
 
 DESENHAR = r'''
 import json, sys
 from PIL import Image, ImageDraw
-plano = json.load(open(sys.argv[1]))
+plano = json.load(open(sys.argv[1], encoding="utf-8"))
 paginas = []
 for p in plano["paginas"]:
     base = Image.open(p["imagem"]).convert("RGBA")
@@ -44,28 +63,38 @@ paginas[0].save(plano["saida"], save_all=True, append_images=paginas[1:], resolu
 '''
 
 
-def ocr(imagem):
-    if not shutil.which("swift"):
-        # shortcut: o OCR usa o Vision do macOS; em outro sistema, destaque o print à mão.
-        sys.exit("Este script precisa do macOS (swift + Vision). Destaque o expediente à mão no print.")
-    r = subprocess.run(["swift", str(AQUI / "ocr_linhas.swift"), str(imagem)], capture_output=True, text=True)
+def norm(t):
+    """Sem acento, sem espaço e em minúsculas: o OCR do Windows lê "Intimacao(1234567)-Prioridade"."""
+    t = unicodedata.normalize("NFKD", t)  # também troca os parênteses largos "（" por "("
+    return re.sub(r"\s+", "", "".join(c for c in t if not unicodedata.combining(c))).lower()
+
+
+def ocr(imagem, motor="auto"):
+    """(linhas de texto, largura, altura) do print."""
+    if motor == "vision" or (motor == "auto" and sys.platform == "darwin" and shutil.which("swift")):
+        cmd = ["swift", str(AQUI / "ocr_linhas.swift"), str(imagem)]
+    else:
+        cmd = ["uv", "run", "--no-project", "--quiet", *RAPIDOCR, "python", "-c", LER, str(imagem)]
+    r = subprocess.run(cmd, capture_output=True, **UTF8)
     if r.returncode != 0:
         sys.exit(f"Falha no OCR de {imagem}:\n{r.stderr[-1500:]}")
-    return [json.loads(l) for l in r.stdout.splitlines() if l.strip()]
+    dados = [json.loads(l) for l in r.stdout.splitlines() if l.startswith("{")]
+    tam = next(d for d in dados if "largura" in d)
+    return [d for d in dados if "texto" in d], tam["largura"], tam["altura"]
 
 
 def faixas(linhas, expedientes, largura, altura):
     """Caixa de cada expediente pedido e marcas nas frases de ciência. Devolve {nº: faixa}."""
-    titulos = sorted((l for l in linhas if TITULO.match(l["texto"])), key=lambda l: l["y"])
+    titulos = sorted((l for l in linhas if TITULO.match(norm(l["texto"]))), key=lambda l: l["y"])
     out = {}
     for i, t in enumerate(titulos):
-        n = TITULO.match(t["texto"]).group(1)
+        n = TITULO.match(norm(t["texto"])).group(1)
         if n not in expedientes:
             continue
         topo = max(t["y"] - 12, 0)
         fim = titulos[i + 1]["y"] - 12 if i + 1 < len(titulos) else altura - 2
         marcas = [[l["x"] - 4, l["y"] - 3, l["x"] + l["w"] + 4, l["y"] + l["h"] + 3]
-                  for l in linhas if "ciência em" in l["texto"] and topo <= l["y"] < fim]
+                  for l in linhas if "cienciaem" in norm(l["texto"]) and topo <= l["y"] < fim]
         out[n] = {"caixa": [max(t["x"] - 10, 2), topo, largura - 6, fim], "marcas": marcas}
     return out
 
@@ -75,6 +104,8 @@ def main():
     ap.add_argument("imagens", nargs="*", type=Path)
     ap.add_argument("--expediente", action="append", default=[], help="número do expediente (repita para vários)")
     ap.add_argument("-o", "--saida", type=Path)
+    ap.add_argument("--ocr", choices=["auto", "vision", "rapidocr"], default="auto",
+                    help="auto: Vision no Mac, RapidOCR no Windows e no Linux")
     ap.add_argument("--teste", action="store_true")
     a = ap.parse_args()
     if a.teste:
@@ -82,16 +113,10 @@ def main():
     if not (a.imagens and a.expediente and a.saida):
         ap.error("informe os prints, ao menos um --expediente e -o saída.pdf")
     if not shutil.which("uv"):
-        sys.exit("Instale o uv (https://docs.astral.sh/uv/) para desenhar o destaque.")
+        sys.exit("Instale o uv (https://docs.astral.sh/uv/) para ler e destacar o print.")
     paginas, achados = [], set()
     for img in a.imagens:
-        linhas = ocr(img)
-        largura = max(l["x"] + l["w"] for l in linhas) + 20
-        altura = max(l["y"] + l["h"] for l in linhas) + 20
-        r = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(img)], capture_output=True, text=True)
-        tam = re.findall(r"pixel(?:Width|Height): (\d+)", r.stdout)
-        if len(tam) == 2:
-            largura, altura = int(tam[0]), int(tam[1])
+        linhas, largura, altura = ocr(img, a.ocr)
         f = faixas(linhas, set(a.expediente), largura, altura)
         achados |= set(f)
         paginas.append({"imagem": str(img.resolve()), "faixas": list(f.values())})
@@ -105,14 +130,14 @@ def main():
         plano = Path(tmp, "plano.json")
         plano.write_text(json.dumps({"saida": str(a.saida.resolve()), "paginas": paginas}), encoding="utf-8")
         r = subprocess.run(["uv", "run", "--no-project", "--quiet", "--with", "pillow==10.4.0", "python", "-c", DESENHAR,
-                            str(plano)], capture_output=True, text=True)
+                            str(plano)], capture_output=True, **UTF8)
         if r.returncode != 0:
             sys.exit("Falha ao desenhar:\n" + r.stderr[-1500:])
     print(f"{a.saida}: {len(paginas)} página(s); destacados: {', '.join(sorted(achados))}")
 
 
 def _teste():
-    linhas = [
+    linhas = [  # como o Vision do Mac lê
         {"texto": "Intimação (111) - Prioridade: Normal - ID do documento (9)", "x": 26, "y": 100, "w": 500, "h": 18},
         {"texto": "Usuário Domicílio Eletrônico registrou ciência em 26/05/2025 20:11:22", "x": 29, "y": 180, "w": 480, "h": 17},
         {"texto": "Citação (222) - Prioridade: Normal - ID do documento (9)", "x": 29, "y": 260, "w": 500, "h": 18},
@@ -123,6 +148,12 @@ def _teste():
     assert f["111"]["marcas"] == [[25, 177, 513, 200]]
     assert f["222"]["caixa"][3] == 998 and len(f["222"]["marcas"]) == 1  # último vai até o fim da imagem
     assert faixas(linhas, {"999"}, 2000, 1000) == {}
+    rapido = [  # como o RapidOCR (Windows) lê: sem acento, sem espaço, parêntese largo
+        {"texto": "Intimacao（111)-Prioridade:Normal-IDdodocumento（9)", "x": 26, "y": 100, "w": 500, "h": 18},
+        {"texto": "UsuarioDomicilioEletronicoregistroucienciaem26/05/202520:11:22", "x": 29, "y": 180, "w": 480, "h": 17},
+        {"texto": "Citacao(222)-Prioridade:Normal-IDdodocumento(9)", "x": 29, "y": 260, "w": 500, "h": 18},
+    ]
+    assert faixas(rapido, {"111"}, 2000, 1000) == {"111": f["111"]}
     print("ok: todos os testes passaram")
 
 

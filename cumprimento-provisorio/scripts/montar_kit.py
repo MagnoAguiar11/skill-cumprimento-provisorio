@@ -19,6 +19,7 @@ O processo.md é o gerado por ler_processo.py (títulos "### Página N · ID X (
 """
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -31,7 +32,7 @@ JUNTAR = r'''
 import io, json, sys
 from pypdf import PdfReader, PdfWriter
 from PIL import Image
-plano = json.load(open(sys.argv[1]))
+plano = json.load(open(sys.argv[1], encoding="utf-8"))
 fonte = PdfReader(plano["pdf"])
 for arquivo in plano["arquivos"]:
     w = PdfWriter()
@@ -49,6 +50,7 @@ for arquivo in plano["arquivos"]:
     w.write(arquivo["saida"])
 '''
 IMAGEM = (".png", ".jpg", ".jpeg")
+UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
 
 
 def mapa_de_paginas(md):
@@ -131,7 +133,7 @@ def main():
         plano = Path(tmp, "plano.json")
         plano.write_text(json.dumps({"pdf": str(a.pdf.resolve()), "arquivos": arquivos}), encoding="utf-8")
         r = subprocess.run(["uv", "run", "--no-project", "--quiet", "--with", "pypdf==5.1.0", "--with", "pillow==10.4.0",
-                            "python", "-c", JUNTAR, str(plano)], capture_output=True, text=True)
+                            "python", "-c", JUNTAR, str(plano)], capture_output=True, **UTF8)
         if r.returncode != 0:
             sys.exit("Falha ao montar os PDFs:\n" + r.stderr[-2000:])
     for arq in arquivos:

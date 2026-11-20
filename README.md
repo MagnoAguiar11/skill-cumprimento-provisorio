@@ -30,6 +30,23 @@ cp -R skill-cumprimento-provisorio/cumprimento-provisorio ~/.claude/skills/
 
 Depois, abra uma sessão nova, anexe o PDF do processo e peça, por exemplo: "faça o cumprimento provisório da multa deste processo".
 
+### Windows
+
+1. Instale o Git (https://git-scm.com), o Claude Code e o uv. Para o uv, no PowerShell:
+
+   ```powershell
+   winget install --id=astral-sh.uv -e
+   ```
+
+2. No PowerShell, baixe e instale a skill:
+
+   ```powershell
+   git clone https://github.com/MagnoAguiar11/skill-cumprimento-provisorio.git
+   Copy-Item -Recurse skill-cumprimento-provisorio\cumprimento-provisorio $HOME\.claude\skills\
+   ```
+
+3. Abra uma sessão nova do Claude Code, anexe o PDF do processo e faça o pedido. Os scripts rodam com `python` (ou `py`). A pasta `Cumprimento Provisórios - HRH` é criada na Área de Trabalho; se ela estiver no OneDrive, a skill usa a do OneDrive.
+
 ### Claude.ai
 
 Compacte a pasta `cumprimento-provisorio` em .zip e envie na área de Skills das configurações.
@@ -43,7 +60,7 @@ Compacte a pasta `cumprimento-provisorio` em .zip e envie na área de Skills das
   ```
 
 - Para ler o processo: [MarkItDown](https://github.com/microsoft/markitdown) 0.1.9 (Microsoft, licença MIT). Basta ter o [uv](https://docs.astral.sh/uv/) instalado: o `scripts/ler_processo.py` roda o MarkItDown pelo `uv`, sem instalação permanente, uma página por vez (inteiro, ele junta as páginas de PDFs com tabela, como os do PJe). Sem o uv, usa o `markitdown` instalado (`pip install 'markitdown[pdf]'`, Python 3.10+), mas as páginas podem vir juntas. Sem nenhum dos dois, a skill usa `pdftotext` (poppler) ou, no Mac, o PDFKit (`scripts/pdf_texto.swift`). Teste: `python3 cumprimento-provisorio/scripts/ler_processo.py --teste`.
-- O Word (`scripts/gerar_docx.py`, python-docx) e os PDFs (`scripts/montar_kit.py`, pypdf) saem pelo uv. O demonstrativo em PDF usa o Google Chrome (ou Chromium/Edge). O destaque da aba Expedientes usa o Vision do macOS (`scripts/ocr_linhas.swift`).
+- O Word (`scripts/gerar_docx.py`, python-docx) e os PDFs (`scripts/montar_kit.py`, pypdf) saem pelo uv. O demonstrativo em PDF usa o Google Chrome ou o Microsoft Edge (que já vem no Windows). O destaque da aba Expedientes lê o print com o Vision do macOS ou, no Windows e no Linux, com o RapidOCR, que o uv baixa sozinho na primeira vez.
 - Opcional: a extensão Claude in Chrome para pesquisar no JusBrasil.
 
 ## Estrutura

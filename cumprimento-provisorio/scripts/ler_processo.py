@@ -10,6 +10,7 @@ anota o ID (PJe) ou as folhas (e-SAJ) e lista as páginas sem texto (escaneadas)
   python3 ler_processo.py --teste
 """
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -17,6 +18,7 @@ import sys
 from pathlib import Path
 
 MARKITDOWN = "markitdown[pdf]==0.1.9"
+UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
 
 ID_PJE = re.compile(r"Num\.\s*(\d{5,})\s*-\s*P[áa]g\.\s*(\d+)")
 ASSINATURA = re.compile(r"Assinado eletronicamente por:\s*(.+?)\s*-\s*(\d{2}/\d{2}/\d{4})")
@@ -52,7 +54,7 @@ def converter(pdf):
     else:
         sys.exit("MarkItDown não encontrado. Instale o uv (https://docs.astral.sh/uv/) "
                  "ou rode: pip install 'markitdown[pdf]' (Python 3.10+).")
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, **UTF8)
     if r.returncode != 0:
         sys.exit("O MarkItDown falhou:\n" + r.stderr[-2000:])
     avisos = [l for l in r.stderr.splitlines() if l.strip() and "FontBBox" not in l]  # ruído do pdfminer

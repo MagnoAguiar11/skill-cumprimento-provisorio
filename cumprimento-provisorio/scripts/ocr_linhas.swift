@@ -1,5 +1,6 @@
-// Lê o texto de uma imagem com o Vision do macOS e imprime uma linha JSON por trecho:
-// {"texto": "...", "x": .., "y": .., "w": .., "h": ..}  (pixels, origem no canto superior esquerdo)
+// Lê o texto de uma imagem com o Vision do macOS. Imprime primeiro {"largura": .., "altura": ..}
+// e depois uma linha JSON por trecho: {"texto": "...", "x": .., "y": .., "w": .., "h": ..}
+// (pixels, origem no canto superior esquerdo). No Windows/Linux, destacar_expediente.py usa o RapidOCR.
 //   swift ocr_linhas.swift print.png
 import AppKit
 import Foundation
@@ -12,6 +13,8 @@ guard CommandLine.arguments.count > 1,
     exit(1)
 }
 let W = Double(cg.width), H = Double(cg.height)
+let tamanho = try JSONSerialization.data(withJSONObject: ["largura": cg.width, "altura": cg.height])
+print(String(data: tamanho, encoding: .utf8)!)  // primeira linha: tamanho da imagem em pixels
 let pedido = VNRecognizeTextRequest()
 pedido.recognitionLevel = .accurate
 pedido.recognitionLanguages = ["pt-BR"]

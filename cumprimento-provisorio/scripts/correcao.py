@@ -105,7 +105,7 @@ def conferir(pagamentos, linhas, indices, variacoes, final):
         if prox in variacoes and prox in indices:
             calc = (indices[prox] / indices[m] - 1) * 100
             if abs(calc - variacoes[prox]) > Decimal("0.011"):
-                avisos.append(f"{rotulo(prox)}: variação pelo número-índice {calc:.2f}% ≠ variação publicada {variacoes[prox]}%")
+                avisos.append(f"{rotulo(prox)}: variação pelo número-índice {calc:.2f}% diferente da variação publicada {variacoes[prox]}%")
         elif prox in indices:
             avisos.append(f"{rotulo(prox)}: sem variação publicada para conferir")
         m = prox

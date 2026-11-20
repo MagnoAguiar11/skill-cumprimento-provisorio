@@ -25,8 +25,13 @@ from pathlib import Path
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 RODAPE = ("Almeida & Aguiar Advogados · Av. Sargento Hermínio 3100 – Torre Empresarial Rio Mar · 60355-512 · "
           "WhatsApp (85) 99231-7224")
-CHROMES = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "google-chrome", "chromium",
-           "chromium-browser", "chrome", "msedge"]
+CHROMES = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+           "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+           r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+           r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+           r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+           r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+           "google-chrome", "chromium", "chromium-browser", "chrome", "msedge"]
 
 CSS = """
 @page { size: A4; margin: 14mm 14mm 18mm 14mm;
@@ -137,7 +142,7 @@ def gerar_pdf(html_txt, saida):
         pagina.write_text(html_txt, encoding="utf-8")
         r = subprocess.run([chrome(), "--headless=new", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer",
                             f"--user-data-dir={tmp}/perfil", f"--print-to-pdf={Path(saida).resolve()}", pagina.as_uri()],
-                           capture_output=True, text=True, timeout=120)
+                           capture_output=True, encoding="utf-8", errors="replace", timeout=120)
         if not Path(saida).exists():
             sys.exit("Falha ao gerar o PDF:\n" + r.stderr[-1500:])
 

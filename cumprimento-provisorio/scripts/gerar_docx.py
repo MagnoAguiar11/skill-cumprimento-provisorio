@@ -20,12 +20,14 @@ Marcações aceitas:
   python3 gerar_docx.py --teste
 """
 import argparse
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
 MODELO = Path(__file__).resolve().parent.parent / "assets" / "folha-modelo.docx"
 
 GERAR = r'''
@@ -254,7 +256,7 @@ def gerar(md, saida, modelo=MODELO):
         sys.exit(f"Folha timbrada não encontrada: {modelo} (use --modelo ou --sem-modelo)")
     Path(saida).expanduser().parent.mkdir(parents=True, exist_ok=True)  # cria a pasta do cliente, se faltar
     r = subprocess.run(["uv", "run", "--no-project", "--quiet", "--with", "python-docx==1.1.2", "python", "-c", GERAR,
-                        str(md), str(Path(saida).expanduser()), str(modelo or "")], capture_output=True, text=True)
+                        str(md), str(Path(saida).expanduser()), str(modelo or "")], capture_output=True, **UTF8)
     if r.returncode != 0:
         sys.exit("Falha ao gerar o Word:\n" + r.stderr[-2000:])
 
