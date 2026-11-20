@@ -50,6 +50,10 @@ for arquivo in plano["arquivos"]:
     w.write(arquivo["saida"])
 '''
 IMAGEM = (".png", ".jpg", ".jpeg")
+# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
+# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
+ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
+PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
 UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
 
 
@@ -132,7 +136,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         plano = Path(tmp, "plano.json")
         plano.write_text(json.dumps({"pdf": str(a.pdf.resolve()), "arquivos": arquivos}), encoding="utf-8")
-        r = subprocess.run(["uv", "run", "--no-project", "--quiet", "--with", "pypdf==5.1.0", "--with", "pillow==10.4.0",
+        r = subprocess.run(["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "pypdf==5.1.0", "--with", "pillow==10.4.0",
                             "python", "-c", JUNTAR, str(plano)], capture_output=True, **UTF8)
         if r.returncode != 0:
             sys.exit("Falha ao montar os PDFs:\n" + r.stderr[-2000:])

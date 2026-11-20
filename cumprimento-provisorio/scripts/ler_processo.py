@@ -4,6 +4,7 @@
 O MarkItDown (github.com/microsoft/markitdown, licença MIT) converte o PDF em texto.
 Este script separa as páginas, tira o rodapé de assinatura do PJe de cada uma,
 anota o ID (PJe) ou as folhas (e-SAJ) e lista as páginas sem texto (escaneadas).
+Se o MarkItDown não rodar no computador, o texto sai do pypdfium2 (--leitor escolhe à mão).
 
   python3 ler_processo.py processo.pdf              -> grava processo.md ao lado do PDF
   python3 ler_processo.py processo.pdf -o saida.md
@@ -18,6 +19,10 @@ import sys
 from pathlib import Path
 
 MARKITDOWN = "markitdown[pdf]==0.1.9"
+# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
+# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
+ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
+PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
 UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
 
 ID_PJE = re.compile(r"Num\.\s*(\d{5,})\s*-\s*P[áa]g\.\s*(\d+)")
@@ -45,9 +50,23 @@ sys.stdout.write("\f".join(out))
 '''
 
 
-def converter(pdf):
-    if shutil.which("uv"):
-        cmd = ["uv", "run", "--no-project", "--quiet", "--with", MARKITDOWN, "python", "-c", POR_PAGINA, str(pdf)]
+# Plano B: se o MarkItDown não rodar no computador (no Windows, o onnxruntime que ele usa pede o Visual C++),
+# o texto de cada página sai direto do pypdfium2, que não depende de nada.
+SO_PDFIUM = r'''
+import sys
+import pypdfium2 as pdfium
+doc = pdfium.PdfDocument(sys.argv[1])
+sys.stdout.write("\f".join(doc[i].get_textpage().get_text_bounded().replace("\r\n", "\n") for i in range(len(doc))))
+'''
+
+
+def converter(pdf, leitor="auto"):
+    if leitor == "pdfium":
+        if not shutil.which("uv"):
+            sys.exit("Instale o uv (https://docs.astral.sh/uv/) para ler o PDF.")
+        cmd = ["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "pypdfium2==4.30.0", "python", "-c", SO_PDFIUM, str(pdf)]
+    elif shutil.which("uv"):
+        cmd = ["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", MARKITDOWN, "python", "-c", POR_PAGINA, str(pdf)]
     elif shutil.which("markitdown"):
         # shortcut: sem uv, o documento vai inteiro e as páginas podem vir juntas; instale o uv para separar
         cmd = ["markitdown", str(pdf)]
@@ -55,8 +74,12 @@ def converter(pdf):
         sys.exit("MarkItDown não encontrado. Instale o uv (https://docs.astral.sh/uv/) "
                  "ou rode: pip install 'markitdown[pdf]' (Python 3.10+).")
     r = subprocess.run(cmd, capture_output=True, **UTF8)
+    if r.returncode != 0 and leitor == "auto" and shutil.which("uv"):
+        print("O MarkItDown não rodou neste computador; o texto foi lido pelo pypdfium2. Motivo:\n"
+              + r.stderr.strip()[-600:], file=sys.stderr)
+        return converter(pdf, "pdfium")
     if r.returncode != 0:
-        sys.exit("O MarkItDown falhou:\n" + r.stderr[-2000:])
+        sys.exit("A leitura do PDF falhou:\n" + r.stderr[-2000:])
     avisos = [l for l in r.stderr.splitlines() if l.strip() and "FontBBox" not in l]  # ruído do pdfminer
     if avisos:
         print("\n".join(avisos)[-1000:], file=sys.stderr)
@@ -125,13 +148,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pdf", nargs="?", type=Path)
     ap.add_argument("-o", "--saida", type=Path)
+    ap.add_argument("--leitor", choices=["auto", "markitdown", "pdfium"], default="auto",
+                    help="auto: MarkItDown e, se ele não rodar, pypdfium2")
     ap.add_argument("--teste", action="store_true", help="roda a autoverificação")
     a = ap.parse_args()
     if a.teste:
         return _teste()
     if not a.pdf or not a.pdf.is_file():
         ap.error("informe o PDF do processo")
-    texto = converter(a.pdf)
+    texto = converter(a.pdf, a.leitor)
     saida, docs, sem_texto = mapear(texto)
     destino = a.saida or a.pdf.with_suffix(".md")
     destino.write_text(montar(a.pdf.name, saida, docs, sem_texto), encoding="utf-8")

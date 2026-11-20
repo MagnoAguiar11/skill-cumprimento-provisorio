@@ -21,7 +21,7 @@ Esta skill transforma o processo completo numa petição de cumprimento provisó
 
 ## Referências
 
-No Windows, rode os scripts com `python` (ou `py`) no lugar de `python3`; sem Python instalado, use `uv run --no-project python` (o uv baixa o Python sozinho). O resto é igual. Todos os scripts funcionam no Windows, no Mac e no Linux; só o `pdf_texto.swift` é do Mac e tem alternativa abaixo.
+No Windows, rode os scripts com `python` (ou `py`) no lugar de `python3`; sem Python instalado, use `uv run --no-project --python 3.12 python` (o uv baixa o Python sozinho). O resto é igual. Todos os scripts funcionam no Windows, no Mac e no Linux (testados num Windows 11 em 20/11/2026); só o `pdf_texto.swift` é do Mac e tem alternativa abaixo. Se o MarkItDown não rodar no computador (no Windows sem o Visual C++), o `ler_processo.py` lê o texto pelo pypdfium2 e avisa; o mapa de IDs sai igual.
 
 - `references/dispositivos.md`: texto literal vigente do CPC, da Lei 11.419/2006, da Resolução CNJ 455/2022 e da Súmula 410, conferido nas fontes oficiais.
 - `references/precedentes.md`: julgados do STJ e do TJCE já conferidos, com trecho literal e link, organizados por tema. É o ponto de partida da pesquisa, não o fim.
@@ -33,7 +33,7 @@ No Windows, rode os scripts com `python` (ou `py`) no lugar de `python3`; sem Py
 - `scripts/montar_kit.py`: recorta do PDF do processo, por ID, os documentos que instruem o cumprimento provisório; grava a procuração sozinha e junta o resto num PDF com marcadores.
 - `scripts/gerar_docx.py`: transforma a petição em Markdown no Word (.docx) na folha timbrada (`assets/folha-modelo.docx`), com endereçamento em negrito, citações recuadas, link clicável abaixo de cada julgado e tabelas no padrão do escritório.
 - `scripts/demonstrativo_pdf.py`: transforma o demonstrativo de cálculo em PDF com a logo (`assets/logo.png`), pelo Chrome.
-- `scripts/destacar_expediente.py`: acha, nos prints da aba Expedientes, a linha de cada expediente e a destaca (fundo amarelo, borda vermelha e marca-texto na ciência). Lê o print com OCR: no Mac, o Vision do sistema (`ocr_linhas.swift`); no Windows e no Linux, o RapidOCR, que o uv baixa sozinho na primeira vez (cerca de 2 minutos).
+- `scripts/destacar_expediente.py`: acha, nos prints da aba Expedientes, a linha de cada expediente e a destaca (fundo amarelo, borda vermelha e marca-texto na ciência). Lê o print com o OCR do próprio sistema, sem instalar nada: no Mac, o Vision (`ocr_linhas.swift`); no Windows 10/11, o OCR do Windows (`ocr_linhas.ps1`); no Linux, o RapidOCR.
 - `scripts/conferir_citacoes.py`: confere se cada trecho citado entre aspas existe, palavra por palavra, na lei, no processo ou no julgado.
 
 ## Fase 1: leitura do processo
@@ -60,7 +60,7 @@ Leia o mapa primeiro e use as buscas abaixo no `processo.md`.
   - "O sistema registrou ciência em" é ciência tácita (fim dos 10 dias corridos). Também vale como intimação pessoal (Lei 11.419/2006, art. 5º, §§ 3º e 6º).
   - "Comunicação frustrada" quer dizer que não houve intimação.
   - A "data limite" do expediente serve para conferir a conta da calculadora.
-- **Páginas escaneadas** (AR, certidões, comprovantes, prints) não têm texto. Transforme-as em imagem (em qualquer sistema: `uv run --no-project --with pypdfium2==4.30.0 --with pillow==10.4.0 python -c "import sys, pypdfium2 as p; d = p.PdfDocument(sys.argv[1]); [d[int(n) - 1].render(scale=2).to_pil().save(f'pagina-{n}.png') for n in sys.argv[2:]]" processo.pdf 12 13`; no Mac, também `swift scripts/pdf_texto.swift processo.pdf --imagem 12,13 pasta`) e leia os PNG. Em outros sistemas, leia essas páginas com a ferramenta de leitura de PDF. Nunca presuma o conteúdo de página que não leu: o AR assinado pelo devedor costuma estar justamente numa delas.
+- **Páginas escaneadas** (AR, certidões, comprovantes, prints) não têm texto. Transforme-as em imagem (em qualquer sistema: `uv run --no-project --python 3.12 --with pypdfium2==4.30.0 --with pillow==10.4.0 python -c "import sys, pypdfium2 as p; d = p.PdfDocument(sys.argv[1]); [d[int(n) - 1].render(scale=2).to_pil().save(f'pagina-{n}.png') for n in sys.argv[2:]]" processo.pdf 12 13`; no Mac, também `swift scripts/pdf_texto.swift processo.pdf --imagem 12,13 pasta`) e leia os PNG. Em outros sistemas, leia essas páginas com a ferramenta de leitura de PDF. Nunca presuma o conteúdo de página que não leu: o AR assinado pelo devedor costuma estar justamente numa delas.
 - **Sem MarkItDown e sem uv:** `pdftotext -layout`, ou, no Mac, `swift scripts/pdf_texto.swift processo.pdf > processo.txt`. Avise o advogado e monte o mapa de IDs à mão (documento, tipo, data e ID) antes de seguir.
 
 **Buscas úteis no texto:** `Num. `, `Assinado eletronicamente`, `Domicílio Judicial`, `DJEN`, `Diário`, `expediente`, `ciência`, `Decorrido prazo`, `mandado`, `AR`, `intime-se`, `multa`, `astreinte`, `por dia`, `limitad`, `teto`, `até o limite`, `tutela`, `liminar`, `efeito suspensivo`, `agravo`, `apelação`, `trânsito`, `gratuidade`, `justiça gratuita`, `valor da causa`, `Súmula`, `Tema`, `descumpri`, `majora`, `bloqueio`, `SISBAJUD`.

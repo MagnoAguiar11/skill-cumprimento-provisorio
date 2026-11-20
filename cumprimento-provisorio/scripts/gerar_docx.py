@@ -27,6 +27,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
+# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
+ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
+PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
 UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}  # Windows: sem isso o texto sai em cp1252
 MODELO = Path(__file__).resolve().parent.parent / "assets" / "folha-modelo.docx"
 
@@ -255,7 +259,7 @@ def gerar(md, saida, modelo=MODELO):
     if modelo and not Path(modelo).exists():
         sys.exit(f"Folha timbrada não encontrada: {modelo} (use --modelo ou --sem-modelo)")
     Path(saida).expanduser().parent.mkdir(parents=True, exist_ok=True)  # cria a pasta do cliente, se faltar
-    r = subprocess.run(["uv", "run", "--no-project", "--quiet", "--with", "python-docx==1.1.2", "python", "-c", GERAR,
+    r = subprocess.run(["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "python-docx==1.1.2", "python", "-c", GERAR,
                         str(md), str(Path(saida).expanduser()), str(modelo or "")], capture_output=True, **UTF8)
     if r.returncode != 0:
         sys.exit("Falha ao gerar o Word:\n" + r.stderr[-2000:])
@@ -272,9 +276,9 @@ def _teste():
         for modelo in ([MODELO] if MODELO.exists() else []) + [None]:
             out = Path(tmp, "t.docx")
             gerar(md, out, modelo)
-            z = zipfile.ZipFile(out)
-            xml = z.read("word/document.xml").decode("utf-8")
-            rels = z.read("word/_rels/document.xml.rels").decode("utf-8")
+            with zipfile.ZipFile(out) as z:  # fechar antes de apagar: o Windows não apaga arquivo aberto
+                xml = z.read("word/document.xml").decode("utf-8")
+                rels = z.read("word/_rels/document.xml.rels").decode("utf-8")
             for esperado in ("EXCELENTÍSSIMO JUÍZO", "TÍTULO", "1. SÍNTESE", "w:hyperlink", "w:tblHeader", "013F6E", "E3EAF3",
                              "2.000,00", 'w:type="page"', "ASSINATURA", "destaque", "w:noBreakHyphen", "w:tblLayout"):
                 assert esperado in xml, esperado

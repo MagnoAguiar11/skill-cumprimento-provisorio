@@ -32,11 +32,13 @@ Depois, abra uma sessão nova, anexe o PDF do processo e peça, por exemplo: "fa
 
 ### Windows
 
-1. Instale o Git (https://git-scm.com), o Claude Code e o uv. Para o uv, no PowerShell:
+1. Instale o Git (https://git-scm.com), o Claude Code e o uv. Para o uv, use o instalador oficial no PowerShell (não pede administrador; o `winget` pode travar pedindo permissão para instalar o Visual C++):
 
    ```powershell
-   winget install --id=astral-sh.uv -e
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
+
+   Feche e abra o PowerShell depois, para o `uv` entrar no caminho. Não é preciso instalar o Python: o uv baixa o 3.12 sozinho na primeira vez.
 
 2. No PowerShell, baixe e instale a skill:
 
@@ -60,7 +62,7 @@ Compacte a pasta `cumprimento-provisorio` em .zip e envie na área de Skills das
   ```
 
 - Para ler o processo: [MarkItDown](https://github.com/microsoft/markitdown) 0.1.9 (Microsoft, licença MIT). Basta ter o [uv](https://docs.astral.sh/uv/) instalado: o `scripts/ler_processo.py` roda o MarkItDown pelo `uv`, sem instalação permanente, uma página por vez (inteiro, ele junta as páginas de PDFs com tabela, como os do PJe). Sem o uv, usa o `markitdown` instalado (`pip install 'markitdown[pdf]'`, Python 3.10+), mas as páginas podem vir juntas. Sem nenhum dos dois, a skill usa `pdftotext` (poppler) ou, no Mac, o PDFKit (`scripts/pdf_texto.swift`). Teste: `python3 cumprimento-provisorio/scripts/ler_processo.py --teste`.
-- O Word (`scripts/gerar_docx.py`, python-docx) e os PDFs (`scripts/montar_kit.py`, pypdf) saem pelo uv. O demonstrativo em PDF usa o Google Chrome ou o Microsoft Edge (que já vem no Windows). O destaque da aba Expedientes lê o print com o Vision do macOS ou, no Windows e no Linux, com o RapidOCR, que o uv baixa sozinho na primeira vez.
+- O Word (`scripts/gerar_docx.py`, python-docx) e os PDFs (`scripts/montar_kit.py`, pypdf) saem pelo uv. O demonstrativo em PDF usa o Google Chrome ou o Microsoft Edge (que já vem no Windows). O destaque da aba Expedientes lê o print com o OCR do próprio sistema: o Vision no Mac e o OCR do Windows no Windows 10/11 (no Linux, o RapidOCR). Se o MarkItDown não rodar (no Windows sem o Visual C++), a leitura do processo usa o pypdfium2 e avisa.
 - Opcional: a extensão Claude in Chrome para pesquisar no JusBrasil.
 
 ## Estrutura
@@ -77,7 +79,7 @@ cumprimento-provisorio/
   scripts/montar_kit.py         procuração sozinha e demais documentos num PDF com marcadores, na pasta do cliente
   scripts/gerar_docx.py         petição em Word na folha timbrada, com citações recuadas, links e tabelas
   scripts/demonstrativo_pdf.py  demonstrativo de cálculo em PDF com a logo
-  scripts/destacar_expediente.py  destaca o expediente nos prints da aba Expedientes (com ocr_linhas.swift)
+  scripts/destacar_expediente.py  destaca o expediente nos prints da aba Expedientes (OCR: ocr_linhas.swift no Mac, ocr_linhas.ps1 no Windows)
   assets/folha-modelo.docx      folha timbrada do escritório; assets/logo.png: logo para o demonstrativo
   scripts/conferir_citacoes.py  confere cada citação literal contra a lei, o processo e os julgados
   scripts/pdf_texto.swift       no Mac: texto do PDF e páginas escaneadas em imagem

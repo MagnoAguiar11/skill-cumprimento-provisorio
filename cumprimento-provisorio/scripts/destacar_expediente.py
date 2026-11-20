@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Destaca, nos prints da aba "Expedientes" do PJe, a linha de cada expediente pedido e gera um PDF.
 
-Lê o texto do print com OCR: no Mac, o Vision do sistema (ocr_linhas.swift); no Windows e no Linux,
-o RapidOCR, que o uv baixa sozinho na primeira vez (demora cerca de 2 minutos; depois fica em cache).
+Lê o texto do print com o OCR do próprio sistema, sem instalar nada: no Mac, o Vision (ocr_linhas.swift);
+no Windows 10/11, o Windows.Media.Ocr (ocr_linhas.ps1). No Linux, o RapidOCR, que o uv baixa sozinho.
 A linha do expediente vai do título "Intimação (N) - Prioridade..." até o título do expediente
 seguinte; ela recebe fundo amarelo e borda vermelha, e a frase da ciência ("... registrou ciência
 em ...") recebe marca-texto. As páginas com destaque vêm primeiro; as demais seguem na ordem dada.
@@ -24,6 +24,10 @@ import unicodedata
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
+# Python 3.12 fixo (o mais novo nem sempre tem os pacotes). No Windows ARM, a versão x64, que o Windows emula:
+# vários pacotes (cryptography, pyclipper) não têm versão pronta para ARM e não compilam sem o Visual C++.
+ARM_WIN = os.name == "nt" and "ARM64" in os.environ.get("PROCESSOR_ARCHITECTURE", "") + os.environ.get("PROCESSOR_ARCHITEW6432", "")
+PYTHON = ["--python", "cpython-3.12-windows-x86_64-none" if ARM_WIN else "3.12"]
 UTF8 = {"encoding": "utf-8", "errors": "replace", "env": {**os.environ, "PYTHONUTF8": "1"}}
 TITULO = re.compile(r"^[a-z]+\((\d+)\)-prioridade")  # texto normalizado: "intimacao(1234567)-prioridade:normal..."
 RAPIDOCR = ["--with", "rapidocr_onnxruntime==1.3.24", "--with", "pillow==10.4.0"]
@@ -71,10 +75,16 @@ def norm(t):
 
 def ocr(imagem, motor="auto"):
     """(linhas de texto, largura, altura) do print."""
-    if motor == "vision" or (motor == "auto" and sys.platform == "darwin" and shutil.which("swift")):
+    if motor == "auto":
+        motor = "vision" if sys.platform == "darwin" and shutil.which("swift") else "windows" if os.name == "nt" else "rapidocr"
+    if motor == "vision":
         cmd = ["swift", str(AQUI / "ocr_linhas.swift"), str(imagem)]
+    elif motor == "windows":
+        local = Path(tempfile.mkdtemp()) / ("print" + Path(imagem).suffix)  # o OCR do Windows só abre arquivo local
+        shutil.copyfile(imagem, local)
+        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(AQUI / "ocr_linhas.ps1"), str(local)]
     else:
-        cmd = ["uv", "run", "--no-project", "--quiet", *RAPIDOCR, "python", "-c", LER, str(imagem)]
+        cmd = ["uv", "run", "--no-project", "--quiet", *PYTHON, *RAPIDOCR, "python", "-c", LER, str(imagem)]
     r = subprocess.run(cmd, capture_output=True, **UTF8)
     if r.returncode != 0:
         sys.exit(f"Falha no OCR de {imagem}:\n{r.stderr[-1500:]}")
@@ -104,8 +114,8 @@ def main():
     ap.add_argument("imagens", nargs="*", type=Path)
     ap.add_argument("--expediente", action="append", default=[], help="número do expediente (repita para vários)")
     ap.add_argument("-o", "--saida", type=Path)
-    ap.add_argument("--ocr", choices=["auto", "vision", "rapidocr"], default="auto",
-                    help="auto: Vision no Mac, RapidOCR no Windows e no Linux")
+    ap.add_argument("--ocr", choices=["auto", "vision", "windows", "rapidocr"], default="auto",
+                    help="auto: Vision no Mac, OCR do Windows no Windows, RapidOCR no Linux")
     ap.add_argument("--teste", action="store_true")
     a = ap.parse_args()
     if a.teste:
@@ -129,7 +139,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         plano = Path(tmp, "plano.json")
         plano.write_text(json.dumps({"saida": str(a.saida.resolve()), "paginas": paginas}), encoding="utf-8")
-        r = subprocess.run(["uv", "run", "--no-project", "--quiet", "--with", "pillow==10.4.0", "python", "-c", DESENHAR,
+        r = subprocess.run(["uv", "run", "--no-project", "--quiet", *PYTHON, "--with", "pillow==10.4.0", "python", "-c", DESENHAR,
                             str(plano)], capture_output=True, **UTF8)
         if r.returncode != 0:
             sys.exit("Falha ao desenhar:\n" + r.stderr[-1500:])
