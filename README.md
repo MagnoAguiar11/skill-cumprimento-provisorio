@@ -19,35 +19,37 @@ Skill para o Claude (Claude Code ou Claude.ai). Ela lê o processo completo e re
 
 Antes de redigir, a skill mostra um diagnóstico e espera a autorização do advogado.
 
-## Instalação
+## Instalação em um passo
 
-### Claude Code
+Abra o Claude Code (no app do Claude, aba **Code**, ou no terminal com `claude`) e cole:
 
-```bash
-git clone https://github.com/MagnoAguiar11/skill-cumprimento-provisorio.git
-cp -R skill-cumprimento-provisorio/cumprimento-provisorio ~/.claude/skills/
-```
+> Instale esta skill: https://github.com/MagnoAguiar11/skill-cumprimento-provisorio
 
-Depois, abra uma sessão nova, anexe o PDF do processo e peça, por exemplo: "faça o cumprimento provisório da multa deste processo".
+O Claude lê as instruções abaixo, pede sua autorização e roda o instalador. Ele instala o uv (que cuida do Python e das bibliotecas), baixa a skill, coloca na pasta de skills do Claude e testa tudo. Não pede senha de administrador. Para atualizar depois, cole o mesmo pedido.
 
-### Windows
+### Instruções para o Claude Code
 
-1. Instale o Git (https://git-scm.com), o Claude Code e o uv. Para o uv, use o instalador oficial no PowerShell (não pede administrador; o `winget` pode travar pedindo permissão para instalar o Visual C++):
+Quando o usuário pedir para instalar ou atualizar esta skill, rode o instalador do sistema dele, sem pedir que ele instale nada à mão:
 
-   ```powershell
-   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-   ```
+- **Mac ou Linux** (terminal):
 
-   Feche e abra o PowerShell depois, para o `uv` entrar no caminho. Não é preciso instalar o Python: o uv baixa o 3.12 sozinho na primeira vez.
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/MagnoAguiar11/skill-cumprimento-provisorio/main/instalar.sh | bash
+  ```
 
-2. No PowerShell, baixe e instale a skill:
+- **Windows** (PowerShell):
 
-   ```powershell
-   git clone https://github.com/MagnoAguiar11/skill-cumprimento-provisorio.git
-   Copy-Item -Recurse skill-cumprimento-provisorio\cumprimento-provisorio $HOME\.claude\skills\
-   ```
+  ```powershell
+  powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/MagnoAguiar11/skill-cumprimento-provisorio/main/instalar.ps1 | iex"
+  ```
 
-3. Abra uma sessão nova do Claude Code, anexe o PDF do processo e faça o pedido. Os scripts rodam com `python` (ou `py`). A pasta `Cumprimento Provisórios - HRH` é criada na Área de Trabalho; se ela estiver no OneDrive, a skill usa a do OneDrive.
+O instalador demora alguns minutos na primeira vez e termina listando os testes ("ok: todos os testes passaram"). Mostre esse resultado ao usuário e diga para abrir uma **sessão nova** do Claude Code, anexar o PDF do processo baixado do PJe e os prints da aba Expedientes e pedir: "Faça o cumprimento provisório deste processo". Se algum teste falhar, mostre a mensagem e tente corrigir a causa (por exemplo, rodar de novo depois de reabrir o terminal).
+
+Quem preferir pode rodar o mesmo comando direto no terminal, sem o Claude.
+
+### Instalação manual
+
+Sem o instalador: copie a pasta `cumprimento-provisorio` deste repositório para `~/.claude/skills/` (no Windows, `%USERPROFILE%\.claude\skills\`) e instale o uv pelo site https://docs.astral.sh/uv/. No Windows, use o instalador oficial do uv no PowerShell, e não o `winget`, que pode travar pedindo permissão para instalar o Visual C++. A pasta `Cumprimento Provisórios - HRH` é criada na Área de Trabalho (com o OneDrive ligado, na Área de Trabalho do OneDrive).
 
 ### Claude.ai
 
@@ -68,6 +70,8 @@ Compacte a pasta `cumprimento-provisorio` em .zip e envie na área de Skills das
 ## Estrutura
 
 ```
+instalar.sh                     instalador para Mac e Linux
+instalar.ps1                    instalador para Windows
 cumprimento-provisorio/
   SKILL.md                      fluxo de trabalho e regras
   references/dispositivos.md    texto literal da lei, conferido nas fontes oficiais
